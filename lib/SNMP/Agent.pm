@@ -1,5 +1,26 @@
 package SNMP::Agent;
 
+=pod
+
+=head1 NAME
+
+SNMP::Agent - A simple SNMP AgentX subagent
+
+=head1 VERSION
+
+Version 0.03
+
+=cut
+
+our $VERSION = '0.03';
+
+=head1 SYNOPSIS
+
+Eliminates most of the hassle in developing simple SNMP subagents in perl.
+A list of SNMP OIDs are registered to callbacks that return the data.
+
+=cut
+
 use warnings;
 use strict;
 
@@ -7,7 +28,11 @@ use Carp qw(croak);
 use NetSNMP::agent (':all');
 use NetSNMP::ASN qw(ASN_OCTET_STR);
 
-sub generic_handler
+=head1 FUNCTIONS
+
+=cut
+
+sub _generic_handler
 {
 
   # $oid, $suboid_handler and $asn_type are provided by the anonymous callback
@@ -19,7 +44,7 @@ sub generic_handler
 
   for ($request = $requests ; $request ; $request = $request->next())
   {
-    my $oid = $request->getOID();
+    my $oid  = $request->getOID();
     my $mode = $request_info->getMode();
 
     if ($mode == MODE_GET)
@@ -51,45 +76,11 @@ sub generic_handler
   }
 }
 
-sub run($)
-{
-  my $self = shift;
+=head2 new
 
-  my $agent = new NetSNMP::agent(
+Get an SNMP::Agent object. See EXAMPLES for use.
 
-    # makes the agent read a my_agent_name.conf file
-    'Name'   => $self->{name},
-    'AgentX' => 1
-  );
-
-  # register each oid handler individually to the same callback function
-  my $root_oid = $self->{root_oid};
-  foreach my $suboid (keys %{$self->{suboid_map}})
-  {
-    my $oid            = join('.', ($root_oid, $suboid));
-    my $suboid_handler = $self->{suboid_map}->{$suboid}->{handler};
-    my $asn_type       = $self->{suboid_map}->{$suboid}->{type};
-
-    # All suboid handlers are a sub ref.
-    if (ref $suboid_handler ne 'CODE')
-    {
-      $suboid_handler = ($asn_type == ASN_OCTET_STR) ?
-        sub { return "$suboid_handler" } : sub { return $suboid_handler };
-    }
-
-    $agent->register($self->{name}, $oid,
-      sub { generic_handler($oid, $suboid_handler, $asn_type, @_) });
-  }
-
-  my $running = 1;
-  while ($running)
-  {
-    $agent->agent_check_and_process(1);
-  }
-
-  $agent->shutdown();
-}
-
+=cut
 sub new
 {
   my $class = shift;
@@ -101,8 +92,7 @@ sub new
     suboid_map => {},
   };
 
-  croak "Invalid agent name" unless ($name     =~ /^\w+$/);
-  croak "Invalid root oid"   unless ($root_oid =~ /^[\d\.]+$/);
+  croak "Invalid agent name" unless ($name =~ /^\w+$/);
   croak "Need hash reference to suboid handlers"
     unless (ref $suboid_handler_map eq "HASH");
 
@@ -129,27 +119,54 @@ sub new
   return $self;
 }
 
-=pod
+=head2 run
 
-=head1 NAME
-
-SNMP::Agent - A simple SNMP AgentX subagent
-
-=head1 VERSION
-
-Version 0.01
+Called on an SNMP::Agent object with no arguments to start the agent.
 
 =cut
+sub run
+{
+  my $self = shift;
 
-our $VERSION = '0.01';
+  my $agent = new NetSNMP::agent(
+
+    # makes the agent read a my_agent_name.conf file
+    'Name'   => $self->{name},
+    'AgentX' => 1
+  );
+
+  # register each oid handler individually to the same callback function
+  my $root_oid = $self->{root_oid};
+  foreach my $suboid (keys %{$self->{suboid_map}})
+  {
+    my $oid            = join('.', ($root_oid, $suboid));
+    my $suboid_handler = $self->{suboid_map}->{$suboid}->{handler};
+    my $asn_type       = $self->{suboid_map}->{$suboid}->{type};
+
+    # All suboid handlers are a sub ref.
+    if (ref $suboid_handler ne 'CODE')
+    {
+      $suboid_handler =
+        ($asn_type == ASN_OCTET_STR)
+        ? sub { return "$suboid_handler" }
+        : sub { return $suboid_handler };
+    }
+
+    $agent->register($self->{name}, $oid,
+      sub { _generic_handler($oid, $suboid_handler, $asn_type, @_) });
+  }
+
+  my $running = 1;
+  while ($running)
+  {
+    $agent->agent_check_and_process(1);
+  }
+
+  $agent->shutdown();
+}
 
 
-=head1 SYNOPSIS
-
-Eliminates most of the hassle in developing simple SNMP subagents in perl.
-A list of SNMP OIDs are registered to callbacks that return the data.
-
-=head2 Example Code
+=head1 EXAMPLES
 
   use SNMP::Agent;
   use NetSNMP::ASN qw/ASN_GAUGE/;
@@ -201,10 +218,9 @@ is MODE_SET_ACTION there is a third argument, the value to be set.
 
 =head2 Caching
 
-No caching of responses is done by BP::SNMP_Agent.  Any results from
+No caching of responses is done by SNMP::Agent.  Any results from
 expensive operations should probably be cached for some time in case
 of duplicate requests for the same information.
-
 
 =head1 AUTHOR
 
@@ -215,6 +231,11 @@ Alexander Else, C<< <aelse at else.id.au> >>
 Please report any bugs or feature requests to C<bug-snmp-agent at rt.cpan.org>, or through
 the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=SNMP-Agent>.  I will be notified, and then you'll
 automatically be notified of progress on your bug as I make changes.
+
+=head2 COUNTER64
+
+Strange values are returned for non-zero 64 bit counters. I suspect something in either NetSNMP::agent or communication
+between it and the snmp daemon. From cursory investigation it does not appear to be a simple endian problem. I may be wrong.
 
 =head1 SUPPORT
 
@@ -262,4 +283,4 @@ See http://dev.perl.org/licenses/ for more information.
 
 =cut
 
-1; # End of SNMP::Agent
+1;    # End of SNMP::Agent
