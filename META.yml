@@ -17,10 +17,10 @@ name: SNMP-Agent
 provides:
   SNMP::Agent:
     file: lib/SNMP/Agent.pm
-    version: 0.03
+    version: 0.04
 requires:
   NetSNMP::ASN: 0
   NetSNMP::agent: 0
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.03
+version: 0.04
