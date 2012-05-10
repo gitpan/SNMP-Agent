@@ -13,15 +13,15 @@ use strict;
 
 use Carp qw(croak);
 use NetSNMP::agent (':all');
-use NetSNMP::ASN qw(ASN_OCTET_STR ASN_NULL);
+use NetSNMP::ASN qw(ASN_OCTET_STR ASN_BIT_STR ASN_NULL ASN_GAUGE ASN_UNSIGNED ASN_COUNTER ASN_COUNTER64 ASN_TIMETICKS);
 
 =head1 VERSION
 
-Version 0.05
+Version 0.06
 
 =cut
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 =head1 SYNOPSIS
 
@@ -79,6 +79,20 @@ sub _generic_handler
 
         my $new_asn_type = $self->_get_asn_type($oid);
         $new_asn_type ||= $asn_type;
+
+        if($new_asn_type == ASN_UNSIGNED ||
+           $new_asn_type == ASN_COUNTER ||
+           $new_asn_type == ASN_COUNTER64 ||
+           $new_asn_type == ASN_TIMETICKS )
+        {
+          $value = sprintf("%u", $value);
+        }
+
+        if($new_asn_type == ASN_OCTET_STR ||
+           $new_asn_type == ASN_BIT_STR )
+        {
+          $value = sprintf("%s", $value);
+        }
 
         # Possible that a GET request came for an unhandled OID
         # (undef value from handler) - don't set a value.
